@@ -31,16 +31,20 @@ if "doc_context" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Load Baseline Data from /data directory
+# Load Baseline Data from /data directory safely
 def load_baseline_data():
     text = ""
-    if os.path.exists("data"):
+    # The isdir check prevents the app from crashing if 'data' is accidentally created as a file
+    if os.path.exists("data") and os.path.isdir("data"):
         for fname in os.listdir("data"):
             if fname.endswith(".pdf"):
                 path = os.path.join("data", fname)
-                reader = PdfReader(path)
-                for page in reader.pages:
-                    text += (page.extract_text() or "") + "\n"
+                try:
+                    reader = PdfReader(path)
+                    for page in reader.pages:
+                        text += (page.extract_text() or "") + "\n"
+                except Exception:
+                    pass # Skip unreadable PDFs silently
     return text
 
 if not st.session_state.doc_context:
@@ -50,9 +54,13 @@ if not st.session_state.doc_context:
 if uploaded_files:
     uploaded_text = ""
     for file in uploaded_files:
-        reader = PdfReader(file)
-        for page in reader.pages:
-            uploaded_text += (page.extract_text() or "") + "\n"
+        try:
+            reader = PdfReader(file)
+            for page in reader.pages:
+                uploaded_text += (page.extract_text() or "") + "\n"
+        except Exception:
+            st.sidebar.error(f"Could not read {file.name}")
+            
     st.session_state.doc_context += "\n" + uploaded_text
     st.sidebar.success(f"Added {len(uploaded_files)} document(s) to knowledge base!")
 
@@ -69,7 +77,8 @@ if user_query := st.chat_input("Ask about your courses, timetable, or exams...")
     with st.chat_message("assistant"):
         with st.spinner("Analyzing coursework..."):
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # Updated to the currently active model
+                model = genai.GenerativeModel("gemini-2.5-flash")
                 prompt = f"""You are UniAgent, an academic co-pilot for university students.
 Answer the student's question accurately using ONLY the context provided below.
 If the information is not in the context, clearly state that it is not covered in the current syllabus or schedule.
@@ -85,4 +94,4 @@ STUDENT QUESTION:
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"API Error: {e}. Please check your API key or network connection.")
