@@ -77,8 +77,8 @@ if user_query := st.chat_input("Ask about your courses, timetable, or exams...")
     with st.chat_message("assistant"):
         with st.spinner("Analyzing coursework..."):
             try:
-                # Updated to the currently active model
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                # Updated to the new, active 3.6 Flash model
+                model = genai.GenerativeModel("gemini-3.6-flash")
                 prompt = f"""You are UniAgent, an academic co-pilot for university students.
 Answer the student's question accurately using ONLY the context provided below.
 If the information is not in the context, clearly state that it is not covered in the current syllabus or schedule.
