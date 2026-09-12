@@ -17,6 +17,7 @@ _doc_matrix: np.ndarray | None = None
 
 
 def _build_index(documents: List[Document]) -> None:
+    """Build a TF-IDF index for the supplied documents."""
     global _vectorizer, _document_ids, _doc_matrix
     if not documents:
         raise RetrievalError("No documents available for indexing")
@@ -35,26 +36,10 @@ def _build_index(documents: List[Document]) -> None:
         _doc_matrix = _vectorizer.fit_transform(corpus)
         
     _logger.debug("TF-IDF index built for %d documents", len(documents))
-    """Build a TF‑IDF index for the supplied documents.
-
-    This function populates the module‑level ``_vectorizer``, ``_document_ids``
-    and ``_doc_matrix`` variables.
-    """
-    global _vectorizer, _document_ids, _doc_matrix
-    if not documents:
-        raise RetrievalError("No documents available for indexing")
-
-    # Concatenate all page texts for each document.
-    corpus = [doc.get_text() for doc in documents]
-    _document_ids = [doc.doc_id for doc in documents]
-    _vectorizer = TfidfVectorizer(stop_words="english")
-    _doc_matrix = _vectorizer.fit_transform(corpus)
-    _logger.debug("TF‑IDF index built for %d documents", len(documents))
 
 
 def _ensure_index() -> None:
-    """Make sure the TF‑IDF index is built; if not, build it from the store.
-    """
+    """Make sure the TF-IDF index is built; if not, build it from the store."""
     global _vectorizer
     if _vectorizer is None:
         # Lazy import to avoid circular dependency.
@@ -64,15 +49,7 @@ def _ensure_index() -> None:
 
 
 def retrieve(query: str, top_k: int | None = None) -> List[Tuple[Document, float]]:
-    """Return the most relevant documents for a query.
-
-    Args:
-        query: The user query string.
-        top_k: Number of top results to return; defaults to ``Config.RETRIEVAL_TOP_K``.
-
-    Returns:
-        List of ``(Document, score)`` tuples ordered by descending relevance.
-    """
+    """Return the most relevant documents for a query."""
     try:
         _ensure_index()
         if _vectorizer is None or _doc_matrix is None:
