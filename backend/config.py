@@ -19,7 +19,7 @@ class Config:
     # Gemini API key (required)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     # Gemini model name (default to a reasonable model)
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     # Optional: storage path for persisted document store (JSON file)
     STORE_PATH: str = os.getenv(
         "DOCUMENT_STORE_PATH",
