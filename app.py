@@ -3,8 +3,8 @@ import streamlit as st
 
 # Bridge Streamlit Secrets into standard environment variables for Zayem's backend
 if "GEMINI_API_KEY" in st.secrets:
-    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]import streamlit as st
-import os
+    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+
 from backend.conversation import ConversationManager
 from backend.document_processor import process_document
 from backend.document_store import add_document, get_documents, load_documents
