@@ -1,97 +1,72 @@
 import streamlit as st
 import os
-from pypdf import PdfReader
-import google.generativeai as genai
+from backend.conversation import ConversationManager
+from backend.document_processor import process_document
+from backend.document_store import add_document, get_documents, load_documents
+from backend.config import Config
+
+# Validate and load stored documents into memory
+Config.validate()
+load_documents()
 
 st.set_page_config(page_title="UniAgent | Academic Co-Pilot", page_icon="🎓", layout="wide")
 st.title("🎓 UniAgent: Academic Co-Pilot")
 st.markdown("Your AI assistant for BS program syllabi, reference books, and schedules.")
 
-# API Key Resolution
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+# Initialize Conversation Manager in Session State
+if "manager" not in st.session_state:
+    st.session_state.manager = ConversationManager()
+    st.session_state.current_conv = st.session_state.manager.get_or_create("student_session")
 
+conv = st.session_state.current_conv
+
+# --- SIDEBAR: Admin & CR Controls ---
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    user_key = st.text_input("Gemini API Key (optional override)", type="password")
-    if user_key:
-        api_key = user_key
+    st.header("⚙️ Admin & CR Controls")
+    uploaded_files = st.file_uploader("Upload PDF Documents", accept_multiple_files=True, type=["pdf"])
     
-    st.header("📄 Upload Documents")
-    uploaded_files = st.file_uploader("Upload Syllabus / Notes / Timetable (PDF)", type=["pdf"], accept_multiple_files=True)
-
-if not api_key:
-    st.warning("Please provide a Gemini API Key in Streamlit Secrets or via the sidebar.")
-    st.stop()
-
-genai.configure(api_key=api_key)
-
-# Session State for Document Context & Chat
-if "doc_context" not in st.session_state:
-    st.session_state.doc_context = ""
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Load Baseline Data from /data directory safely
-def load_baseline_data():
-    text = ""
-    # The isdir check prevents the app from crashing if 'data' is accidentally created as a file
-    if os.path.exists("data") and os.path.isdir("data"):
-        for fname in os.listdir("data"):
-            if fname.endswith(".pdf"):
-                path = os.path.join("data", fname)
-                try:
-                    reader = PdfReader(path)
-                    for page in reader.pages:
-                        text += (page.extract_text() or "") + "\n"
-                except Exception:
-                    pass # Skip unreadable PDFs silently
-    return text
-
-if not st.session_state.doc_context:
-    st.session_state.doc_context = load_baseline_data()
-
-# Ingest Uploaded Documents
-if uploaded_files:
-    uploaded_text = ""
-    for file in uploaded_files:
-        try:
-            reader = PdfReader(file)
-            for page in reader.pages:
-                uploaded_text += (page.extract_text() or "") + "\n"
-        except Exception:
-            st.sidebar.error(f"Could not read {file.name}")
+    if st.button("Process & Update Agent"):
+        if uploaded_files:
+            with st.spinner("Processing documents..."):
+                for uploaded_file in uploaded_files:
+                    temp_path = os.path.join(".", uploaded_file.name)
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    doc = process_document(temp_path)
+                    add_document(doc)
+                    os.remove(temp_path)
+                
+                st.success(f"Successfully integrated {len(uploaded_files)} document(s)!")
+        else:
+            st.warning("Please upload files before processing.")
             
-    st.session_state.doc_context += "\n" + uploaded_text
-    st.sidebar.success(f"Added {len(uploaded_files)} document(s) to knowledge base!")
+    st.markdown("---")
+    st.subheader("📚 Loaded Documents")
+    stored_docs = get_documents()
+    if stored_docs:
+        for d in stored_docs:
+            st.text(f"• {d.title} ({len(d.pages)} pages)")
+    else:
+        st.text("No documents loaded yet.")
 
-# Display Conversation History
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# --- MAIN CHAT INTERFACE ---
+for message in conv.get_history():
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Chat Input & Response Generation
-if user_query := st.chat_input("Ask about your courses, timetable, or exams..."):
-    st.chat_message("user").markdown(user_query)
-    st.session_state.messages.append({"role": "user", "content": user_query})
+if user_question := st.chat_input("Ask about your schedule, references, or syllabus..."):
+    with st.chat_message("user"):
+        st.markdown(user_question)
     
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing coursework..."):
+        with st.spinner("Searching academic records..."):
             try:
-                # Updated to the new, active 3.6 Flash model
-                model = genai.GenerativeModel("gemini-3.6-flash")
-                prompt = f"""You are UniAgent, an academic co-pilot for university students.
-Answer the student's question accurately using ONLY the context provided below.
-If the information is not in the context, clearly state that it is not covered in the current syllabus or schedule.
-
-ACADEMIC CONTEXT:
-{st.session_state.doc_context[:250000]}
-
-STUDENT QUESTION:
-{user_query}
-"""
-                response = model.generate_content(prompt)
-                reply = response.text
-                st.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
+                response = conv.ask(user_question)
+                st.markdown(response.answer)
+                
+                if response.sources:
+                    source_text = ", ".join([f"{s.document} (Pages: {s.pages})" for s in response.sources])
+                    st.caption(f"📖 Sources: {source_text}")
             except Exception as e:
-                st.error(f"API Error: {e}. Please check your API key or network connection.")
+                st.error(f"An error occurred: {e}")
