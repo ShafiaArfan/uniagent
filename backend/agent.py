@@ -20,19 +20,12 @@ def _initialize_gemini_client():
 
     genai.configure(api_key=Config.GEMINI_API_KEY)
     
-    # Auto-fetch available text models to guarantee a working version
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    if not available_models:
-        raise GeminiError("No text generation models available for this API key.")
+    # HARDCODED: Bypassing all config files to force the exact model Google requires
+    try:
+        model = genai.GenerativeModel("gemini-3.6-flash")
+    except Exception as e:
+        raise GeminiError(f"Failed to load model: {e}")
         
-    # Verify the requested model exists, otherwise fallback to the first active model
-    target_model = Config.GEMINI_MODEL
-    full_target = f"models/{target_model}"
-    if target_model not in available_models and full_target not in available_models:
-        target_model = available_models[0]
-    
-    model = genai.GenerativeModel(target_model)
     return model.generate_content
 
 _gemini_generate = None
