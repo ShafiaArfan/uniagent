@@ -1,7 +1,9 @@
 import os
+import json
 import datetime
 import streamlit as st
 
+# --- SECRETS CONFIGURATION ---
 if "GEMINI_API_KEY" in st.secrets:
     os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
 
@@ -17,6 +19,21 @@ from backend.document_store import add_document, get_documents, load_documents
 load_documents()
 
 st.set_page_config(page_title="UniAgent | Academic Co-Pilot", page_icon="🎓", layout="wide")
+
+# --- ANNOUNCEMENTS DATABASE LOGIC ---
+ANNOUNCEMENT_FILE = "announcements.json"
+
+def load_announcements():
+    if os.path.exists(ANNOUNCEMENT_FILE):
+        with open(ANNOUNCEMENT_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_announcement(text, link, image_path):
+    anns = load_announcements()
+    anns.append({"text": text, "link": link, "image": image_path, "date": str(datetime.date.today())})
+    with open(ANNOUNCEMENT_FILE, "w") as f:
+        json.dump(anns, f)
 
 # --- AUTO-CATEGORIZATION LOGIC ---
 def categorize_doc(title):
@@ -43,6 +60,21 @@ with st.sidebar:
     
     # Portion 1: Schedules & Alerts
     st.markdown("### 📅 Schedules & Alerts")
+    
+    with st.expander("📢 Announcements"):
+        anns = load_announcements()
+        if not anns:
+            st.info("No new announcements at this time.")
+        for ann in reversed(anns): # Show newest first
+            st.caption(f"Posted: {ann.get('date', '')}")
+            if ann.get("text"):
+                st.markdown(f"{ann['text']}")
+            if ann.get("link"):
+                st.markdown(f"[🔗 Click here for more info]({ann['link']})")
+            if ann.get("image") and os.path.exists(ann["image"]):
+                st.image(ann["image"])
+            st.markdown("---")
+
     with st.expander("📌 Classes Schedule"):
         st.info("**Monday:** OOP & DLD\n\n**Tuesday:** Math-II & Multivariable Calculus\n\n**Wednesday:** Probability & Pak Studies")
     with st.expander("📆 Annual Schedule"):
@@ -51,6 +83,21 @@ with st.sidebar:
         st.info("**Mid Terms:** April 06 - 10\n\n**Finals:** June 08 - 12")
     with st.expander("⏰ Deadlines"):
         st.warning("No immediate deadlines uploaded.")
+        
+    with st.expander("⚙️ Admin: Post Announcement"):
+        ann_text = st.text_area("Message / Alert Text")
+        ann_link = st.text_input("Optional Link (URL)")
+        ann_img = st.file_uploader("Optional Image", type=["png", "jpg", "jpeg"])
+        
+        if st.button("Post Announcement"):
+            img_path = ""
+            if ann_img:
+                img_path = f"uploaded_{ann_img.name}"
+                with open(img_path, "wb") as f:
+                    f.write(ann_img.getbuffer())
+            save_announcement(ann_text, ann_link, img_path)
+            st.success("Announcement posted successfully!")
+            st.rerun()
 
     st.markdown("---")
     
