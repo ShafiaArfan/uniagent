@@ -17,6 +17,24 @@ _doc_matrix: np.ndarray | None = None
 
 
 def _build_index(documents: List[Document]) -> None:
+    global _vectorizer, _document_ids, _doc_matrix
+    if not documents:
+        raise RetrievalError("No documents available for indexing")
+
+    corpus = [doc.get_text() for doc in documents]
+    # Ensure corpus isn't completely empty to prevent crashes
+    corpus = [text if text.strip() else "empty_document" for text in corpus]
+    _document_ids = [doc.doc_id for doc in documents]
+    
+    try:
+        _vectorizer = TfidfVectorizer(stop_words="english")
+        _doc_matrix = _vectorizer.fit_transform(corpus)
+    except ValueError:
+        # Fallback for math PDFs or scanned documents with no standard English words
+        _vectorizer = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 4))
+        _doc_matrix = _vectorizer.fit_transform(corpus)
+        
+    _logger.debug("TF-IDF index built for %d documents", len(documents))
     """Build a TF‑IDF index for the supplied documents.
 
     This function populates the module‑level ``_vectorizer``, ``_document_ids``
