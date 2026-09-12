@@ -18,10 +18,19 @@ from backend.document_store import add_document, get_documents, load_documents
 # Load Backend Data
 load_documents()
 
-st.set_page_config(page_title="UniAgent | Academic Co-Pilot", page_icon="🎓", layout="wide")
+# Updated Name to GR-Agent
+st.set_page_config(page_title="GR-Agent | Academic Co-Pilot", page_icon="🎓", layout="wide")
 
-# --- ANNOUNCEMENTS DATABASE LOGIC ---
+# --- DATABASE LOGIC (Announcements & Schedules) ---
 ANNOUNCEMENT_FILE = "announcements.json"
+SCHEDULES_FILE = "schedules.json"
+
+DEFAULT_SCHEDULES = {
+    "classes": "**Monday:** OOP & DLD\n\n**Tuesday:** Math-II & Multivariable Calculus\n\n**Wednesday:** Probability & Pak Studies",
+    "annual": "**Spring 2026:** Feb 09 - June 23\n\n**Summer 2026:** June 29 - Sept 18",
+    "exams": "**Mid Terms:** April 06 - 10\n\n**Finals:** June 08 - 12",
+    "deadlines": "No immediate deadlines uploaded."
+}
 
 def load_announcements():
     if os.path.exists(ANNOUNCEMENT_FILE):
@@ -34,6 +43,16 @@ def save_announcement(text, link, image_path):
     anns.append({"text": text, "link": link, "image": image_path, "date": str(datetime.date.today())})
     with open(ANNOUNCEMENT_FILE, "w") as f:
         json.dump(anns, f)
+
+def load_schedules():
+    if os.path.exists(SCHEDULES_FILE):
+        with open(SCHEDULES_FILE, "r") as f:
+            return json.load(f)
+    return DEFAULT_SCHEDULES
+
+def save_schedules(data):
+    with open(SCHEDULES_FILE, "w") as f:
+        json.dump(data, f)
 
 # --- AUTO-CATEGORIZATION LOGIC ---
 def categorize_doc(title):
@@ -65,7 +84,7 @@ with st.sidebar:
         anns = load_announcements()
         if not anns:
             st.info("No new announcements at this time.")
-        for ann in reversed(anns): # Show newest first
+        for ann in reversed(anns): 
             st.caption(f"Posted: {ann.get('date', '')}")
             if ann.get("text"):
                 st.markdown(f"{ann['text']}")
@@ -75,15 +94,35 @@ with st.sidebar:
                 st.image(ann["image"])
             st.markdown("---")
 
+    # Load dynamic schedules
+    sched_data = load_schedules()
+
     with st.expander("📌 Classes Schedule"):
-        st.info("**Monday:** OOP & DLD\n\n**Tuesday:** Math-II & Multivariable Calculus\n\n**Wednesday:** Probability & Pak Studies")
+        st.info(sched_data["classes"])
     with st.expander("📆 Annual Schedule"):
-        st.info("**Spring 2026:** Feb 09 - June 23\n\n**Summer 2026:** June 29 - Sept 18")
+        st.info(sched_data["annual"])
     with st.expander("📝 Exams Schedule"):
-        st.info("**Mid Terms:** April 06 - 10\n\n**Finals:** June 08 - 12")
+        st.info(sched_data["exams"])
     with st.expander("⏰ Deadlines"):
-        st.warning("No immediate deadlines uploaded.")
+        st.warning(sched_data["deadlines"])
         
+    # Admin: Update Schedules dynamically
+    with st.expander("⚙️ Admin: Update Schedules"):
+        new_classes = st.text_area("Classes Schedule", sched_data["classes"], height=100)
+        new_annual = st.text_area("Annual Schedule", sched_data["annual"], height=100)
+        new_exams = st.text_area("Exams Schedule", sched_data["exams"], height=100)
+        new_deadlines = st.text_area("Deadlines", sched_data["deadlines"], height=100)
+        
+        if st.button("Save Schedules"):
+            save_schedules({
+                "classes": new_classes,
+                "annual": new_annual,
+                "exams": new_exams,
+                "deadlines": new_deadlines
+            })
+            st.success("Schedules updated successfully!")
+            st.rerun()
+
     with st.expander("⚙️ Admin: Post Announcement"):
         ann_text = st.text_area("Message / Alert Text")
         ann_link = st.text_input("Optional Link (URL)")
@@ -136,12 +175,13 @@ with st.sidebar:
                 st.caption(f"📄 {t}")
 
 # --- MAIN CHAT INTERFACE ---
-st.title("🎓 UniAgent: Your Academic Co-Pilot")
+# Updated Name to GR-Agent
+st.title("🎓 GR-Agent: Your Academic Co-Pilot")
 for message in conv.get_history():
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if user_question := st.chat_input("E.g., Explain the concept of binary digits in DLD..."):
+if user_question := st.chat_input("Ask a question..."):
     with st.chat_message("user"):
         st.markdown(user_question)
     
